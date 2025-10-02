@@ -29,6 +29,8 @@ Furthermore, this standard provides wallets and off-chain services a formal way 
 
 ## Specification
 
+The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD", "SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be interpreted as described in [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) and [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174).
+
 ### Ledger
 
 All ledger fields _must_ be exported with the current MRC standard as a prefix followed by two underscores (using `MRC__` as a placeholder).
@@ -378,7 +380,7 @@ This pattern is a strong candidate for a dedicated extension MIP once message st
 ### Callback Support (C2C Interactions)
 
 Once contract-to-contract (C2C) calls are fully supported,
-more advanced token flows (e.g., ERC-677-flavored transfers with callbacks) become possible.
+more advanced token flows become possible.
 
 ### Off-Chain Metadata: `MRC__contractURI`
 
