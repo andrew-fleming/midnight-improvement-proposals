@@ -1,10 +1,26 @@
+<!--
+ Copyright 2025 Midnight Foundation
+
+ Licensed under the Apache License, Version 2.0 (the "License");
+ you may not use this file except in compliance with the License.
+ You may obtain a copy of the License at
+
+     https://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+
 ---
 MIP: ? # assigned by editors
 Title: Contract-based Fungible Token Standard
 Authors: Andrew Fleming <@andrew-fleming>
 Status: Proposed
 Category: Standards
-Created: 2025-09-25
+Created: 2025-10-02
 Requires: [None]
 Replaces: [None]
 License: Apache-2.0
@@ -260,56 +276,6 @@ Contract-to-contract (c2c) interactions are not yet fully supported in the Midni
 As a token standard, the technical specifications should favor both a permissible and minimal interface.
 Therefore, this standard does not enforce signature-based approvals.
 
-## Path to Active
-
-### Acceptance Criteria
-
-1. At least one complete, audited reference implementation of the this standard is deployed and operational on Midnight testnet, demonstrating all required circuits (`transfer`, `approve`, `transferFrom`, etc) and events (`Transfer`, `Approval`).
-
-2. Tooling Support: Minimum viable ecosystem support is established:
-    - At least one major wallet (Lace wallet or other Midnight-compatible wallet)
-    implements automatic token discovery and display using the standard's metadata conventions.
-    - At least one block explorer supports MRC? token detection
-    and displays token transfers with proper formatting (name, symbol, decimals).
-    - Documentation and integration guides are published for wallet developers and service providers.
-
-3. Community Review Period:
-A public review period has allowed for meaningful feedback from ecosystem contributors.
-No major unresolved technical objections or security concerns remain.
-
-4. Bridge Compatibility Validation:
-At least one cross-chain bridge demonstrates successful integration with MRC tokens,
-validating the standard's compatibility goals.
-
-### Implementation Plan
-
-#### Phase 1: Specification Finalization
-
-- Incorporate community feedback from review period.
-- Finalize naming conventions and required metadata fields.
-- Publish finalized specification document.
-
-#### Phase 2: Reference Implementation
-
-- Develop open-source reference implementation in Compact.
-- Include comprehensive test suite covering all standard circuits.
-- Deploy to Midnight testnet for community testing.
-- Conduct security audit of reference implementation.
-
-#### Phase 3: Ecosystem Integration
-
-- Work with wallet providers to implement token discovery.
-- Collaborate with block explorer teams for MRC support.
-- Develop and publish integration documentation.
-- Create example implementations and tutorials for token creators.
-
-#### Phase 4: Validation and Activation
-
-- Gather feedback from early adopters.
-- Validate bridge compatibility with test integrations.
-- Address any implementation issues discovered during testing.
-- Formal transition to Active status upon meeting all acceptance criteria.
-
 ## Backwards Compatibility Assessment
 
 The proposed changes do not introduce breaking changes.
@@ -389,10 +355,6 @@ Several ecosystems (e.g. Ethereum via [EIP-7572](https://eips.ethereum.org/EIPS/
 To ensure lean and bridge-compatible token definitions, this MRC does not include `MRC__contractURI` in the base interface.
 However, ecosystem tools may expect or support it.
 A follow-up MIP may define a standard metadata schema and hosting guidelines.
-
-## Acknowledgements
-
-List the contributors that were not the Authors, this will include any workshop participants.
 
 ## Copyright Waiver
 
