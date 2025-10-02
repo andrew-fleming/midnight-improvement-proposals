@@ -23,7 +23,7 @@ The following standard allows for the implementation of a standard API for unshi
 
 This standard provides basic functionality to transfer tokens,
 as well as allow tokens to be approved so they can be spent by another on-chain third party.
-The latter point will be available when contract-to-contract interactions are fully supported.
+The latter point will be more relevant when contract-to-contract interactions are fully supported.
 
 Furthermore, this standard provides wallets and off-chain services a formal way to access token metadata.
 
@@ -31,84 +31,92 @@ Furthermore, this standard provides wallets and off-chain services a formal way 
 
 ### Ledger
 
-All ledger fields _must_ be exported with the current MRC standard as a prefix followed by two underscores (using `MRC20__` as a placeholder).
-All ledger fields _must_ use double underscores after the standard name `MRC20__balances`.
+All ledger fields _must_ be exported with the current MRC standard as a prefix followed by two underscores (using `MRC__` as a placeholder).
+All ledger fields _must_ use double underscores after the standard name `MRC__balances`.
+Additional token-specific ledger fields SHOULD follow the same namespacing pattern
+(e.g., `MRC__customField`) to prevent conflicts and ensure forward compatibility.
 
-#### MRC20__name
+#### `MRC__name`
 
 The immutable token name.
 
 ```ts
-sealed ledger MRC20__name: Opaque<"string">
+sealed ledger MRC__name: Opaque<"string">
 ```
 
-#### MRC20__symbol
+#### `MRC__symbol`
 
 The immutable token symbol.
 
 ```ts
-sealed ledger MRC20__symbol: Opaque<"string">
+sealed ledger MRC__symbol: Opaque<"string">
 ```
 
-#### MRC20__decimals
+#### `MRC__decimals`
 
 The immutable token decimals.
 
 ```ts
-sealed ledger MRC20__decimals: u8
+sealed ledger MRC__decimals: u8
 ```
 
-#### MRC20__balances
+#### `MRC__balances`
 
 Mapping from account addresses to their token balances.
 
 ```ts
-ledger MRC20__balances: Map<Either<ZswapCoinPublicKey, ContractAddress>, Uint<128>>
+ledger MRC__balances: Map<Either<ZswapCoinPublicKey, ContractAddress>, Uint<256>>
 ```
 
-#### MRC20__allowances
+#### `MRC__allowances`
 
 Mapping from owner accounts to spender accounts and their allowances.
 
 ```ts
-ledger MRC20__allowances: Map<Either<ZswapCoinPublicKey, ContractAddress>, Map<Either<ZswapCoinPublicKey, ContractAddress>, Uint<128>>>
+ledger MRC__allowances: Map<Either<ZswapCoinPublicKey, ContractAddress>, Map<Either<ZswapCoinPublicKey, ContractAddress>, Uint<256>>>
 ```
 
-#### MRC20__totalSupply
+#### `MRC__totalSupply`
 
 The total token supply.
 
 ```ts
-ledger MRC20__totalSupply: Uint<128>
+ledger MRC__totalSupply: Uint<256>
 ```
 
 ### Circuits
 
-#### totalSupply
+#### `totalSupply`
 
 Returns the value of tokens in existence.
 
 ```ts
-circuit totalSupply() → Uint<128>
+circuit totalSupply() → Uint<256>
 ```
 
-#### balanceOf
+#### `balanceOf`
 
 Returns the value of tokens owned by `account`.
 
 ```ts
-circuit balanceOf(account: Either<ZswapCoinPublicKey, ContractAddress>) → Uint<128>
+circuit balanceOf(account: Either<ZswapCoinPublicKey, ContractAddress>) → Uint<256>
 ```
 
-#### transfer
+#### `transfer`
 
 Moves a `value` amount of tokens from the caller’s account to `to`.
+Calling this circuit must emit a Transfer event (even if the transfer amount is `0`).
+
+The circuit MUST fail if the sender's balance is insufficient.
+
+If the `to` address is equal to the zero address (either `ZswapCoinPublicKey` or `ContractAddress`),
+the circuit MUST fail.
 
 ```ts
-circuit transfer(to: Either<ZswapCoinPublicKey, ContractAddress>, value: Uint<128>) → Boolean
+circuit transfer(to: Either<ZswapCoinPublicKey, ContractAddress>, value: Uint<256>) → []
 ```
 
-#### allowance
+#### `allowance`
 
 Returns the amount which `spender` is still allowed to spend from `owner`.
 
@@ -116,33 +124,79 @@ Returns the amount which `spender` is still allowed to spend from `owner`.
 circuit allowance(
     owner: Either<ZswapCoinPublicKey, ContractAddress>,
     spender: Either<ZswapCoinPublicKey, ContractAddress>
-  ) → Uint<128>
+  ) → Uint<256>
 ```
 
-#### approve
+#### `approve`
 
 Sets a `value` amount of tokens as allowance of `spender` over the caller’s tokens.
+The allowance must be set to `0` when setting another `value` for the same `spender`.
+
+> NOTE: Enforcing the allowance to be `0` avoids the race condition issue of EIP20.
+To better address this issue, approvals can be atomic.
+While this standard does not implement atomic approvals directly,
+implementers may extend this spec with optional support for signature-based approvals or callback-based patterns to enable atomic `approve` + `transferFrom` flows once c2c is available.
 
 ```ts
-circuit approve(spender: Either<ZswapCoinPublicKey, ContractAddress>, value: Uint<128>) → Boolean
+circuit approve(spender: Either<ZswapCoinPublicKey, ContractAddress>, value: Uint<256>) → []
 ```
 
-#### transferFrom
+#### `transferFrom`
 
 Moves `value` tokens from `from` to `to` using the allowance mechanism.
-`value` is the deducted from the caller’s allowance.
+`value` is deducted from the allowance previously approved to the caller by the `from` address.
+Calling this circuit must emit a Transfer event (even if the transfer amount is `0`).
+
+The `transferFrom` circuit allows another user or contract (almost always a contract) to spend the tokens of `from`.
+The circuit MUST fail unless the `from` account has deliberately authorized the caller to spend at least `value` amount of tokens.
+
+If the `from` or `to` address is equal to the zero address (either `ZswapCoinPublicKey` or `ContractAddress`),
+the circuit MUST fail.
 
 ```ts
 circuit transferFrom(
     from: Either<ZswapCoinPublicKey, ContractAddress>,
     to: Either<ZswapCoinPublicKey, ContractAddress>,
-    value: Uint<128>
-  ) → Boolean
+    value: Uint<256>
+  ) → []
+```
+
+### Events
+
+> NOTE: The `event` keyword and event emission are not currently supported in Compact.
+This specification defines event formats to guide future tooling and contract upgrades.
+
+#### `Transfer`
+
+The Transfer event MUST trigger when tokens are ever moved (including zero value transfers).
+Tokens that are minted and burned should also emit this event.
+
+```ts
+// pseudo code
+// event emission is not yet supported
+event Transfer(
+  indexed from: Either<ZswapCoinPublicKey, ContractAddress>,
+  indexed to: Either<ZswapCoinPublicKey, ContractAddress>,
+  indexed value: Uint<256>
+)
+```
+
+#### `Approval`
+
+The Approval event MUST trigger when the allowance of a spender is set.
+`value` MUST be the new allowance.
+
+```ts
+// pseudo code
+// event emission is not yet supported
+event Approval(
+  indexed owner: Either<ZswapCoinPublicKey, ContractAddress>,
+  indexed spender: Either<ZswapCoinPublicKey, ContractAddress>,
+  indexed value: Uint<256>
+)
 ```
 
 ## Rationale
-
-Explain the design decisions behind the proposed change. Why was this particular approach chosen? What alternatives were considered, and why were they rejected?
 
 ### Ledger API
 
@@ -158,16 +212,16 @@ explorers, and other off-chain services.
 - **Special character prefix**: The use of `$` or other special character domains i.e. `$balances`.
 This may cause semantic conflicts with other languages.
 
-- **Dedicated `Storage` object**: Contracts use export a ledger API interface which enforces the token interface i.e.
+- **Dedicated `Storage` object**: Contracts export a ledger API interface which enforces the required fields i.e.
 
 ```ts
-struct IMRC20_Storage {
-  balances: Map<Either<ZswapCoinPublicKey, ContractAddress>, Uint<128>>
+struct IMRC_Storage {
+  balances: Map<Either<ZswapCoinPublicKey, ContractAddress>, Uint<256>>
   name: Opaque<"string">
   ...
 }
 
-export ledger Storage: IMRC20_Storage;
+export ledger Storage: IMRC_Storage;
 ```
 
 Struct fields cannot be ADT types.
@@ -180,40 +234,159 @@ The circuits API provides an approximation of the EIP20 API for cross-chain comp
 The main differences reside in the input and output types:
 
 - `address` => `Either<ZswapCoinPublicKey, ContractAddress>`
-- `u256` => `Uint<128>`
 - `string` => `Opaque<"string">`
+
+### Disallowed zero address transfers
+
+Transfers to or from zero addresses are explicitly disallowed to prevent accidental token loss and ambiguous behavior.
+It is up to the implementing contract to define minting or burning functionality,
+including whether such behavior is supported at all and whether publicly callable circuits are provided.
+
+### Midnight native UTXOs
+
+The current functionality of UTXOs does not support expressive functionality that many token protocols require
+such as freezing or pausing assets as well as whitelisting and blacklisting users.
+Such functionality requires a means of enforcing logic within the UTXO spend itself (custom spend logic).
+
+### Callbacks
+
+Callbacks are very useful for introspection and crafting atomic `approve` + `transferFrom` transactions.
+Contract-to-contract (c2c) interactions are not yet fully supported in the Midnight network.
+
+### Signature-based approvals
+
+As a token standard, the technical specifications should favor both a permissible and minimal interface.
+Therefore, this standard does not enforce signature-based approvals.
 
 ## Path to Active
 
-What does it mean to get from Accepted to Active, and how this will be achieved.
-
 ### Acceptance Criteria
 
-Explain what objective milestones need to be achieved in order for the MIP to achieve Active status.
+1. At least one complete, audited reference implementation of the this standard is deployed and operational on Midnight testnet, demonstrating all required circuits (`transfer`, `approve`, `transferFrom`, etc) and events (`Transfer`, `Approval`).
+
+2. Tooling Support: Minimum viable ecosystem support is established:
+    - At least one major wallet (Lace wallet or other Midnight-compatible wallet)
+    implements automatic token discovery and display using the standard's metadata conventions.
+    - At least one block explorer supports MRC? token detection
+    and displays token transfers with proper formatting (name, symbol, decimals).
+    - Documentation and integration guides are published for wallet developers and service providers.
+
+3. Community Review Period:
+A public review period has allowed for meaningful feedback from ecosystem contributors.
+No major unresolved technical objections or security concerns remain.
+
+4. Bridge Compatibility Validation:
+At least one cross-chain bridge demonstrates successful integration with MRC tokens,
+validating the standard's compatibility goals.
 
 ### Implementation Plan
 
-Describe how the MIP will be put into practice.
+#### Phase 1: Specification Finalization
+
+- Incorporate community feedback from review period.
+- Finalize naming conventions and required metadata fields.
+- Publish finalized specification document.
+
+#### Phase 2: Reference Implementation
+
+- Develop open-source reference implementation in Compact.
+- Include comprehensive test suite covering all standard circuits.
+- Deploy to Midnight testnet for community testing.
+- Conduct security audit of reference implementation.
+
+#### Phase 3: Ecosystem Integration
+
+- Work with wallet providers to implement token discovery.
+- Collaborate with block explorer teams for MRC support.
+- Develop and publish integration documentation.
+- Create example implementations and tutorials for token creators.
+
+#### Phase 4: Validation and Activation
+
+- Gather feedback from early adopters.
+- Validate bridge compatibility with test integrations.
+- Address any implementation issues discovered during testing.
+- Formal transition to Active status upon meeting all acceptance criteria.
 
 ## Backwards Compatibility Assessment
 
-Describe how the proposed change affects existing systems, applications, and users. Will it require a hard fork? Are there any compatibility issues? How will they be addressed?
+The proposed changes do not introduce breaking changes.
+As the first formalized token standard for the Midnight ecosystem,
+this MIP does not break compatibility with existing systems.
+There are no deployed contracts that would be affected by this specification.
+
+Contract-based token contracts (prior to the standard) deployed before this standard's adoption will continue to function normally; however,
+they may not be recognized by compliant wallets, explorers, or other ecosystem tools.
 
 ## Security Considerations
 
-Analyze the potential security implications of the proposed change. Are there any new attack vectors or vulnerabilities introduced? How will they be mitigated?
+The well-documented ERC20 race conditions with the `approve` + `transferFrom` flow are mitigated in this standard by forcing approvals to only occur when starting with an allowance of `0`.
+Further improvements to address this issue,
+and to remove the potential extra transaction of setting approvals to `0`,
+are recommended with an approval signature or introducing callbacks.
 
 ## Implementation
 
-Describe how the proposed change will be implemented. Which parts/components of the Midnight need to be modified? What are the dependencies, if any?
+OpenZeppelin's Contracts for Compact library will provide an implementation when all features are available.
+The following implementation approximates this standard:
+
+- [OpenZeppelin implementation](https://github.com/OpenZeppelin/compact-contracts/blob/main/contracts/src/token/FungibleToken.compact)
 
 ## Testing
 
-Describe the testing procedures for the proposed change. What tests will be performed to ensure that it works as expected and does not introduce any regressions?
+This MIP defines an interface specification rather than a concrete implementation.
+Testing focuses on validating that implementations comply with the standard and integrate properly with ecosystem tools.
+
+### Compliance Testing
+
+Token implementations claiming standard compliance SHOULD be validated against:
+
+1. **Interface Compliance**: Required circuits are present and accept correct parameters.
+2. **State Variable Naming**: Mandatory ledger variables follow the specified naming conventions (e.g., `MRC__balances`).
+3. **Metadata Exposure**: Metadata fields are properly exposed and queryable.
+4. **Event Conformance**: `Transfer` and `Approval` events are emitted with correct parameters and indexed fields.
+
+### Integration Testing
+
+Implementations SHOULD verify compatibility with ecosystem infrastructure:
+
+- **Wallets**: Automatic token detection and balance display.
+- **Block Explorers**: Token identification and transaction history formatting.
+- **Bridges**: Cross-chain transfer functionality (if applicable).
+
+### Reference Implementation
+
+The reference implementation will include a comprehensive test suite demonstrating standard compliance.
+Token creators are encouraged to use this as a baseline for their own testing.
 
 ## References (Optional)
 
 Are there any external sources that are referenced in this document, or that add to the efficacy of this MIP?
+
+- [EIP20](https://eips.ethereum.org/EIPS/eip-20)
+
+## Future Considerations
+
+### Signature-based approvals (similar to EIP-2612)
+
+Allow token holders to approve a spender via a signed message,
+without requiring an explicit on-chain approval transaction.
+This improves UX and reduces Dust cost.
+
+This pattern is a strong candidate for a dedicated extension MIP once message standards stabilize.
+
+### Callback Support (C2C Interactions)
+
+Once contract-to-contract (C2C) calls are fully supported,
+more advanced token flows (e.g., ERC-677-flavored transfers with callbacks) become possible.
+
+### Off-Chain Metadata: `MRC__contractURI`
+
+Several ecosystems (e.g. Ethereum via [EIP-7572](https://eips.ethereum.org/EIPS/eip-7572)) expose a `contractURI()` function to return a URI pointing to structured off-chain metadata.
+
+To ensure lean and bridge-compatible token definitions, this MRC does not include `MRC__contractURI` in the base interface.
+However, ecosystem tools may expect or support it.
+A follow-up MIP may define a standard metadata schema and hosting guidelines.
 
 ## Acknowledgements
 
